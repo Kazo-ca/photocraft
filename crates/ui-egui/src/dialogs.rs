@@ -844,9 +844,17 @@ fn about_tab_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, tab: &str) {
             ui.label(crate::i18n::fmt(tl!("Version {version}"), &[("version", &photocraft_engine::build_info::long_version())]));
             ui.add_space(12.0);
             ui.vertical_centered(|ui| {
-                crate::links::discord_button(app, ui, 220.0);
-                ui.add_space(8.0);
-                crate::links::link_row(app, ui);
+                if app.services.hosted {
+                    // A page that hosts the app may run a modified build: no community button or
+                    // ArtCraft link, the project named in plain text (docs/brand/LICENSE-brand.txt).
+                    ui.label(tl!("Based on PhotoCraft by the ArtCraft team."));
+                    ui.add_space(4.0);
+                    crate::links::source_row(app, ui);
+                } else {
+                    crate::links::discord_button(app, ui, 220.0);
+                    ui.add_space(8.0);
+                    crate::links::link_row(app, ui);
+                }
             });
             ui.add_space(10.0);
             ui.weak("egui · wgpu · photocraft-engine");

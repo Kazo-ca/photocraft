@@ -267,6 +267,7 @@ pub use services::{
     LastUpdateFn, LoadTextFn, OpenExternalSvgFn, OpenUrlFn, OsEventsFn, PenEndFn, PenScreenFn, PhotoshopShortcutsFn, PlaceInbox, QuitFn, RecoverFn,
     Recoverable, RightButtonDownFn, SameFileFn, SaveFileFn, SaveTextFn, Services, SystemThemeFn, TabletPollFn, WindowFrameFn, WriteFn,
 };
+pub use services::{DocumentWrite, WriteDocumentFn};
 pub(crate) use services::{opaque_layer, saves_flat_in_place};
 pub use text::bidi_text;
 pub use text::cjk_fonts;
@@ -459,6 +460,11 @@ pub struct PhotocraftApp {
     /// The first digit of a two-digit opacity typed on the number keys (`opacity_keys`, #352).
     pub(crate) opacity_keys: opacity_keys::Pending,
     control_rx: Option<Receiver<ControlRequest>>,
+    /// The save under way was asked for as Save As (File › Save As, a recorded Save As), not as
+    /// a Save of the document's own file: a shell that keeps the document's file
+    /// ([`Services::write_document`]) asks where to put it even when the name is unchanged.
+    /// Set by each save entry point, read when the document is written.
+    pub(crate) save_as_requested: bool,
     /// `ui.screenshot` requests: bounded admission, a weak-slot callback per issuance, monotonic
     /// deadlines and a capture-time geometry epoch (see `screenshot.rs`).
     captures: screenshot::Captures,
@@ -913,6 +919,8 @@ mod transform_corner_projection_tests;
 #[cfg(test)]
 mod transform_selection_rules_tests;
 
+#[cfg(test)]
+mod hosted_save_tests;
 #[cfg(test)]
 mod psd_open_tests;
 #[cfg(test)]

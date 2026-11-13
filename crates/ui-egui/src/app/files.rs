@@ -69,6 +69,14 @@ impl PhotocraftApp {
         self.open_bytes_placed(name, bytes, path, None, None)
     }
 
+    /// [`Self::open_bytes`] for a file that its host keeps under `path` (a page that hosts the
+    /// web build hands over a file with its name): the document lives at `path`, so File › Save
+    /// writes back there when its format keeps the document, and asks for a name otherwise, as
+    /// for a file opened from disk. The save goes to [`crate::Services::write_document`].
+    pub fn open_bytes_at(&mut self, name: &str, bytes: &[u8], path: &str) -> Result<Vec<String>, String> {
+        self.open_bytes_from(name, bytes, Some(path))
+    }
+
     /// [`Self::open_bytes_from`] for a file dropped on a tab slot (`slot`) or opened as one of a
     /// set (`order`): both survive the inline decode, a memory prompt and the final placement.
     pub(crate) fn open_bytes_placed(
@@ -132,7 +140,9 @@ impl PhotocraftApp {
                 name: name.to_string(),
                 path: path.map(str::to_string),
                 warnings: warnings.clone(),
-                bytes: (wants_raw && path.is_none()).then(|| std::sync::Arc::new(bytes.to_vec())),
+                // A path on the web can't be read back (a host's file name), so Camera Raw keeps
+                // the bytes there too.
+                bytes: (wants_raw && (path.is_none() || cfg!(target_arch = "wasm32"))).then(|| std::sync::Arc::new(bytes.to_vec())),
                 slot,
                 order,
                 question,
@@ -211,6 +221,7 @@ impl PhotocraftApp {
         if self.save_options_open() {
             return Err(SAVE_OPTIONS_OPEN.into());
         }
+        self.save_as_requested = !plain_save;
         // Edit Contents documents save back into their smart object.
         if path.is_none() && self.session.is_enabled("layer.smartObjects.saveContents") {
             self.run("layer.smartObjects.saveContents", serde_json::json!({}))?;
@@ -313,6 +324,7 @@ impl PhotocraftApp {
         if self.save_options_open() {
             return Err(SAVE_OPTIONS_OPEN.into());
         }
+        self.save_as_requested = false;
         let r = self.write_save(path, None, choices)?;
         // JPEG Options are recorded only where they change something
         // ([`jpeg_options_ui::plain_save_step`]); the Targa and DDS answers as given.
@@ -332,6 +344,7 @@ impl PhotocraftApp {
         if self.save_options_open() {
             return Err(SAVE_OPTIONS_OPEN.into());
         }
+        self.save_as_requested = false;
         if choices.tga_bits.is_none() && targa_options_ui::wants_prompt(self, &path) {
             let copy = self.saves_copy(&path, None)?;
             targa_options_ui::park(self, path.clone(), copy, "file.save")?;
@@ -512,6 +525,8 @@ impl PhotocraftApp {
             return crate::view_cmds::write_copy(self, &doc, path, choices);
         }
         let path = self.recorded_save_path(params)?;
+        // A recorded Save As.
+        self.save_as_requested = true;
         self.save_as_step(path, params.get("tiffLayers").and_then(Value::as_bool), choices)
     }
 
@@ -577,7 +592,9 @@ impl PhotocraftApp {
     /// `None` when the save went to a background job (#2017), which finishes it in
     /// [`jobs_ui::tick`].
     pub(crate) fn write_document(&mut self, path: String, settings: &ExportSettings, copy: bool) -> Result<Option<(String, Vec<String>)>, String> {
+        // A document save that goes to `write_document` is written here, where it can be handed over.
         if self.background_jobs
+            && (copy || self.services.write_document.is_none())
             && let Some(save) = self.services.save_file.clone()
         {
             // `start_save` checks the memory itself: other callers reach it directly.
@@ -586,13 +603,47 @@ impl PhotocraftApp {
         let st = self.session.active().ok_or("no document")?;
         ensure_memory_to_save(&st.doc, &path)?;
         let (doc, written, previous) = (st.doc.id, st.revision, st.saved_revision);
+        let save_as = document_save_as(self.save_as_requested, st.path.as_deref(), &path);
         let export = self.services.export.as_ref().ok_or("no exporter configured")?;
         let (bytes, warnings) = export(&st.doc, &path, settings)?;
-        let write = self.services.write.as_mut().ok_or("no writer configured")?;
-        write(&path, &bytes)?;
-        let revision = saved_revision_after_write(!self.services.write_unconfirmed, written, previous);
+        let confirmed = match self.services.write_document.as_mut().filter(|_| !copy) {
+            // Saved once the shell confirms it (`confirm_document_write`), not now.
+            Some(write) => {
+                write(crate::DocumentWrite { doc, revision: written, path: &path, bytes: &bytes, save_as })?;
+                false
+            }
+            None => {
+                let write = self.services.write.as_mut().ok_or("no writer configured")?;
+                write(&path, &bytes)?;
+                !self.services.write_unconfirmed
+            }
+        };
+        let revision = saved_revision_after_write(confirmed, written, previous);
         self.saved(doc, revision, &path, &warnings, copy);
         Ok(Some((path, warnings)))
+    }
+
+    /// A document save handed to [`crate::Services::write_document`] reached its file: `doc`
+    /// counts as saved at `revision`, provided it still lives at `path` (a later Save As, or a save
+    /// from another tab over the same file, has moved it on) and no newer save of it was confirmed
+    /// already. Returns whether the document was marked saved; a closed document is left alone.
+    pub fn confirm_document_write(&mut self, doc: DocId, revision: u64, path: &str) -> bool {
+        if !self.session.documents().iter().any(|st| st.doc.id == doc) {
+            return false;
+        }
+        let marked = self.with_document(doc, |app| {
+            let st = app.session.active_mut().ok_or("no document")?;
+            if !confirms(st.path.as_deref(), st.saved_revision, path, revision) {
+                return Ok(false);
+            }
+            st.saved_revision = revision;
+            Ok(true)
+        });
+        let marked = marked.unwrap_or(false);
+        if marked {
+            self.sync_views();
+        }
+        marked
     }
 
     /// After `saver` was written to `path`, any other open document bound to that file no longer
@@ -901,6 +952,20 @@ impl PhotocraftApp {
 /// Refuses a save that won't fit in memory, before any encoding starts (#10024): on the web a
 /// failed allocation aborts the module and the unsaved document is lost with it. The document
 /// stays open and unchanged, and the message says how to free memory.
+/// Whether a save of the document to `path` is a Save As for the shell that keeps its file
+/// ([`crate::DocumentWrite::save_as`]): asked for as Save As, or written anywhere but the document's own
+/// file `own`.
+pub(crate) fn document_save_as(requested: bool, own: Option<&str>, path: &str) -> bool {
+    requested || own != Some(path)
+}
+
+/// Whether a confirmed write of `revision` to `path` marks a document saved: it still lives at
+/// `path`, and its saved revision is older (`u64::MAX` is "unsaved", see
+/// [`PhotocraftApp::detach_others_from_file`]).
+pub(crate) fn confirms(own: Option<&str>, saved_revision: u64, path: &str, revision: u64) -> bool {
+    own == Some(path) && (saved_revision == u64::MAX || saved_revision < revision)
+}
+
 pub(crate) fn ensure_memory_to_save(doc: &photocraft_engine::doc::Document, path: &str) -> Result<(), String> {
     let name = file_open::display_name(path);
     photocraft_engine::memory_gate::ensure_for_save(&format!("save \u{201c}{name}\u{201d}"), photocraft_io::estimate_export_bytes(doc, path))
