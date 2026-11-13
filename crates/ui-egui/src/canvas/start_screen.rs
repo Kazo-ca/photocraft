@@ -25,13 +25,16 @@ pub(super) fn start_screen(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     // The source reads the app, so the page binds copies of the view and the sort and they are written back after.
     let (mut view, mut sort) = (app.ui.chrome.home_recent_view, app.ui.chrome.home_recent_sort);
     let links = links();
+    // The community pages are left out when a page hosts the app (it is not the PhotoCraft
+    // project's own site).
     let footer = footer_links();
+    let footer: &[StartLink] = if app.services.hosted { &[] } else { &footer[..] };
     let actions = {
         let source = crate::home_recent_ui::source(app, &ctx);
         StartScreen::new(Bind::bound(&mut view), Bind::bound(&mut sort), &recent)
             .thumbnails(&thumbs, &source)
             .links(&links[..])
-            .home_layout(Label::from(crate::native_menu::APP_NAME), &footer[..])
+            .home_layout(Label::from(crate::native_menu::APP_NAME), footer)
             .max_recent(HOME_RECENT)
             .card_zoom(HOME_CARD_ZOOM)
             .drop_hint(Label::from(tl!("Drop an image or PSD anywhere to open it.")))

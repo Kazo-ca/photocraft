@@ -10,7 +10,9 @@
 //!   `docInspect`, `uiInspect`, `screenshot`), which drives the same control methods (`api`);
 //! - file pickers return browser file contents asynchronously through `Services::file_dialog`;
 //!   this includes File → Open and commands such as Place Embedded;
-//! - saving/exporting triggers a browser download;
+//! - saving/exporting triggers a browser download, except in host mode (`?host=parent` in a
+//!   same-origin iframe, or `data-host="page"` on the canvas): the page sends the files to open
+//!   and keeps the document's saves (`craft-web-host`, `host`);
 //! - dropped files are read asynchronously by `web::WebShell` and delivered through `Services::inbox`.
 //!
 //! URL query flags: `?cpu` forces the CPU canvas path (same as `PHOTOCRAFT_CPU_CANVAS=1`);
@@ -25,6 +27,12 @@ mod api;
 
 #[cfg(any(target_arch = "wasm32", test))]
 mod diagnostics;
+
+#[cfg(target_arch = "wasm32")]
+mod host;
+
+#[cfg(any(target_arch = "wasm32", test))]
+mod hostmode;
 
 #[cfg(any(target_arch = "wasm32", test))]
 mod preset_bridge;

@@ -84,6 +84,10 @@ pub fn start() {
             }
         };
         let pen_target = canvas.clone();
+        // Host mode (`craft-web-host`): a page that hosts PhotoCraft sends files to open and keeps
+        // the document's saves (`host`). Not hosted, nothing changes.
+        let bridge = crate::host::Bridge::detect(&canvas);
+        let app_bridge = bridge.clone();
         let runner = eframe::WebRunner::new();
         // After the runner's own panic handler, so the message is kept and the runner's handler
         // still runs (a panic aborts the module).
@@ -105,6 +109,9 @@ pub fn start() {
                     preset_warnings.extend(warnings);
                     let drag = listen_drag(&pen_target);
                     let mut services = services(inbox.clone(), place_inbox.clone(), drag_pos_service(pen_target.clone(), drag));
+                    if let Some(bridge) = &app_bridge {
+                        bridge.connect(&mut services, cc.egui_ctx.clone());
+                    }
                     let mut initial = Some(load_initial_preferences(&presets, database.is_some() && !session.actions().list.actions().is_empty()));
                     services.load_prefs = Some(Box::new(move || initial.take().unwrap_or_else(stored_preferences)));
                     let mut app = PhotocraftApp::with_context(cc.egui_ctx.clone(), session, services);
@@ -131,6 +138,9 @@ pub fn start() {
                     }
                     let unsaved = Arc::new(AtomicBool::new(false));
                     guard_unload(unsaved.clone());
+                    if let Some(bridge) = &app_bridge {
+                        bridge.post_ready();
+                    }
                     Ok(Box::new(WebShell {
                         app,
                         inbox,
@@ -142,10 +152,14 @@ pub fn start() {
                         ui_language: "",
                         actions_revision,
                         prefs_revision: None,
+                        bridge: app_bridge,
                     }))
                 }),
             )
             .await;
+        if let (Err(e), Some(bridge)) = (&result, &bridge) {
+            bridge.post_failed(&format!("PhotoCraft failed to start: {e:?}"));
+        }
         if let Some(el) = document.get_element_by_id("photocraft_loading") {
             match result {
                 Ok(()) => el.remove(),
@@ -291,6 +305,7 @@ fn error_parts(value: &wasm_bindgen::JsValue, fallback: &str) -> (String, String
 fn show_stopped(trap_message: &str) {
     STOPPED.store(true, Ordering::Relaxed);
     let detail = crate::diagnostics::detail(crate::diagnostics::take_panic().as_deref(), trap_message);
+    crate::host::post_stopped(&detail);
     let Some(document) = web_sys::window().and_then(|w| w.document()) else { return };
     if let Some(el) = document.get_element_by_id("photocraft_stopped_detail") {
         el.set_text_content(Some(&detail));
@@ -381,6 +396,8 @@ struct WebShell {
     prefs_revision: Option<u64>,
     /// The interface language whose served script font was last asked for.
     ui_language: &'static str,
+    /// Host mode's bridge, when a page hosts the app.
+    bridge: Option<crate::host::Bridge>,
 }
 
 impl WebShell {
@@ -504,6 +521,9 @@ impl eframe::App for WebShell {
             });
         }
         self.serve_fonts(ctx);
+        if let Some(bridge) = &self.bridge {
+            bridge.sync(&mut self.app);
+        }
         self.app.logic_frame(ctx, frame);
         self.save_presets(ctx);
     }

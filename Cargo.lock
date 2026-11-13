@@ -2565,6 +2565,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "craft-web-host"
+version = "0.1.0"
+source = "git+https://github.com/storytold/craft-libs?rev=5c5e0d52c387c0a4ae2908a07e476d7584f60362#5c5e0d52c387c0a4ae2908a07e476d7584f60362"
+dependencies = [
+ "wasm-bindgen",
+ "web-sys",
+]
+
+[[package]]
 name = "craft-win32"
 version = "0.1.0"
 source = "git+https://github.com/storytold/craft-libs?rev=5c5e0d52c387c0a4ae2908a07e476d7584f60362#5c5e0d52c387c0a4ae2908a07e476d7584f60362"
@@ -6997,6 +7006,7 @@ dependencies = [
  "craft-image-codecs",
  "craft-psd",
  "craft-web-api",
+ "craft-web-host",
  "eframe",
  "egui",
  "js-sys",

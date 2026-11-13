@@ -12,6 +12,8 @@ mod control;
 pub(crate) mod doc_queries;
 mod files;
 pub(crate) use files::ensure_memory_to_save;
+#[cfg(test)]
+pub(crate) use files::{confirms, document_save_as};
 mod frame;
 pub(crate) mod framework;
 mod gpu;
@@ -89,6 +91,7 @@ impl PhotocraftApp {
             caps_lock: false,
             opacity_keys: craft::behavior::DigitKeys::default(),
             control: None,
+            save_as_requested: false,
             live_adjust: None,
             frame: 0,
             notices_live: notices::Live::default(),

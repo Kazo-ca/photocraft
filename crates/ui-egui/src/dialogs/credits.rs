@@ -78,8 +78,18 @@ pub fn credits() -> Credits {
 }
 
 /// The About tab's contents: name, blurb, version, the community button and the project links.
-pub fn about_info(_app: &PhotocraftApp) -> AboutInfo {
-    about_info_for(crate::os_window::identity(), photocraft_engine::build_info::long_version(), photocraft_engine::build_info::git_sha())
+pub fn about_info(app: &PhotocraftApp) -> AboutInfo {
+    let info = about_info_for(crate::os_window::identity(), photocraft_engine::build_info::long_version(), photocraft_engine::build_info::git_sha());
+    if app.services.hosted { hosted_about(info) } else { info }
+}
+
+/// About when a page hosts the app, which may run a modified build: no community button and no
+/// ArtCraft link, the project named in plain text (docs/brand/LICENSE-brand.txt).
+fn hosted_about(mut info: AboutInfo) -> AboutInfo {
+    info.community = None;
+    info.links.retain(|link| link.url != crate::links::ARTCRAFT_WEBSITE);
+    info.blurb = format!("{}\n{}", tl!("PhotoCraft — an open-source, native image editor written in Rust."), tl!("Based on PhotoCraft by the ArtCraft team.")).into();
+    info
 }
 
 fn about_info_for(identity: crate::os_window::LaunchIdentity, version: String, commit: Option<&str>) -> AboutInfo {

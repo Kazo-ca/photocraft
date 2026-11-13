@@ -242,6 +242,7 @@ pub use services::{
     PrimaryDownFn, RecoverFn, Recoverable, RightButtonDownFn, SameFileFn, SaveFileFn, SaveTextFn, Services, SystemThemeFn, TabletPollFn, WindowFrameFn,
     WriteFn,
 };
+pub use services::{DocumentWrite, WriteDocumentFn};
 pub(crate) use services::{opaque_layer, saves_flat_in_place};
 pub use text::cjk_fonts;
 pub use text::direction;
@@ -402,6 +403,11 @@ pub struct PhotocraftApp {
     /// The control channel: requests from a transport, the replies waiting on input, jobs and
     /// screenshots, and the screenshot queue (`app/control.rs`).
     control: Option<craft::automation::control::ControlChannel>,
+    /// The save under way was asked for as Save As (File › Save As, a recorded Save As), not as
+    /// a Save of the document's own file: a shell that keeps the document's file
+    /// ([`Services::write_document`]) asks where to put it even when the name is unchanged.
+    /// Set by each save entry point, read when the document is written.
+    pub(crate) save_as_requested: bool,
     /// Live (uncommitted) adjustment edit shown on canvas while a slider is dragged.
     pub live_adjust: Option<(photocraft_doc::LayerId, Value)>,
     /// Frames rendered (for tests and the status bar).
@@ -904,6 +910,8 @@ mod transform_several_tests;
 #[cfg(test)]
 mod transform_selection_rules_tests;
 
+#[cfg(test)]
+mod hosted_save_tests;
 #[cfg(test)]
 mod psd_open_tests;
 #[cfg(test)]
