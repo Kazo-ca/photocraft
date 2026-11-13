@@ -14,6 +14,8 @@ mod commands;
 mod control;
 mod files;
 pub(crate) use files::ensure_memory_to_save;
+#[cfg(test)]
+pub(crate) use files::{confirms, document_save_as};
 mod frame;
 mod gpu;
 mod ime;
@@ -90,6 +92,7 @@ impl PhotocraftApp {
             caps_lock: false,
             opacity_keys: None,
             control_rx: None,
+            save_as_requested: false,
             captures: crate::screenshot::Captures::default(),
             type_ime: type_tool::ImeState::default(),
             input_waiters: Vec::new(),

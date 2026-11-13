@@ -285,6 +285,26 @@ pub type ExportFn = Box<dyn Fn(&Document, &str, &ExportSettings) -> Result<(Vec<
 
 pub type WriteFn = Box<dyn FnMut(&str, &[u8]) -> Result<(), String>>;
 
+/// A save of the document itself, handed to [`Services::write_document`].
+#[derive(Debug, Clone, Copy)]
+pub struct DocumentWrite<'a> {
+    /// The document saved.
+    pub doc: photocraft_doc::DocId,
+    /// Its revision the bytes hold: what [`crate::PhotocraftApp::confirm_document_write`] marks
+    /// saved once the shell knows the file was written.
+    pub revision: u64,
+    /// Where it goes: the file name the save chose (a bare name on the web).
+    pub path: &'a str,
+    pub bytes: &'a [u8],
+    /// `false` when the document is written over its own file (Save of a file that keeps it,
+    /// or a Save that asked for a name and was given the document's own); `true` for Save As,
+    /// a first save, and a save to another file, such as a PSD for a flat file that gained layers.
+    pub save_as: bool,
+}
+
+/// [`Services::write_document`].
+pub type WriteDocumentFn = Box<dyn FnMut(DocumentWrite<'_>) -> Result<(), String>>;
+
 /// What a file on disk looked like when a document last read or wrote it: File › Save asks
 /// before replacing a file another app changed since (#6596).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -510,8 +530,8 @@ pub struct Services {
     pub file_dialog: Option<FileDialogFn>,
     /// Write bytes to a path (native) or trigger a download (web).
     pub write: Option<WriteFn>,
-    /// Size and modification time of a file (native); `None` on the web, where Save never
-    /// writes back to a file.
+    /// Size and modification time of a file (native); `None` on the web, where no file can be
+    /// read back.
     pub file_stamp: Option<FileStampFn>,
     /// Whether two paths name one entry in one folder (native): a save dialog's answer and the
     /// path the save writes to after Lowercase Extension, on a file system that ignores letter
@@ -522,6 +542,17 @@ pub struct Services {
     /// cancel and which reports nothing back), so a save through it names the document but
     /// leaves its changes unsaved and the leave-page guard armed (#4962).
     pub write_unconfirmed: bool,
+    /// Writes the saves of the document itself (Save, Save As), for a shell that keeps the
+    /// document's file apart from copies, exports and preset files: a page that hosts the web
+    /// build stores the document and lets the rest download. `write` still takes everything
+    /// else. A document written through it is not marked saved by the write: it stays modified
+    /// until the shell calls [`crate::PhotocraftApp::confirm_document_write`] (the host says the
+    /// file was stored). `None`: `write` takes document saves too.
+    pub write_document: Option<WriteDocumentFn>,
+    /// The app runs inside a page that hosts it (the web build's host mode): the start screen
+    /// leaves out the community links, and About shows no Discord button or ArtCraft link and
+    /// names the project in plain text.
+    pub hosted: bool,
     /// Encode and write in one step on a worker thread, so a large save doesn't freeze the
     /// window (#2017). With background jobs on, saves use it instead of `export` and `write`.
     pub save_file: Option<SaveFileFn>,

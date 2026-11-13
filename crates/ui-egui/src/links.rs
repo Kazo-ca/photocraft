@@ -45,12 +45,21 @@ pub fn discord_button(app: &mut PhotocraftApp, ui: &mut egui::Ui, min_width: f32
 /// "PhotoCraft website · GitHub · ArtCraft" as links, centred. Clicks route through [`open`] (the
 /// platform browser service) rather than `ui.hyperlink_to`, which uses the unreliable `ctx.open_url`.
 pub fn link_row(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
+    links_row(app, ui, &[(tl!("PhotoCraft website"), APP_PAGE), (tl!("GitHub"), GITHUB), (tl!("ArtCraft"), ARTCRAFT_WEBSITE)]);
+}
+
+/// [`link_row`] without the ArtCraft link, for a hosted app (About in host mode): where the
+/// PhotoCraft source comes from.
+pub fn source_row(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
+    links_row(app, ui, &[(tl!("PhotoCraft website"), APP_PAGE), (tl!("GitHub"), GITHUB)]);
+}
+
+fn links_row(app: &mut PhotocraftApp, ui: &mut egui::Ui, links: &[(&str, &'static str)]) {
     let t = crate::theme::Tokens::get(ui.ctx());
-    let links = [(tl!("PhotoCraft website"), APP_PAGE), (tl!("GitHub"), GITHUB), (tl!("ArtCraft"), ARTCRAFT_WEBSITE)];
     let font = egui::FontId::proportional(12.5);
     let sep = "  ·  ";
     let width: f32 = links.iter().map(|(l, _)| ui.painter().layout_no_wrap((*l).into(), font.clone(), t.text).size().x).sum::<f32>()
-        + 2.0 * ui.painter().layout_no_wrap(sep.into(), font.clone(), t.text).size().x;
+        + links.len().saturating_sub(1) as f32 * ui.painter().layout_no_wrap(sep.into(), font.clone(), t.text).size().x;
     let mut clicked: Option<&str> = None;
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 0.0;

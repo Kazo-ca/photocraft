@@ -163,7 +163,11 @@ fn render_start_rail(app: &mut PhotocraftApp, ui: &mut egui::Ui, rail_w: f32) {
         crate::links::open(app, ui.ctx(), crate::links::TUTORIALS);
     }
 
-    // 5. Bottom pinned community links
+    // 5. Bottom pinned community links, which a page that hosts the app leaves out (it is not
+    // the PhotoCraft project's own site).
+    if app.services.hosted {
+        return;
+    }
     let bottom_h = 100.0;
     let avail_h = ui.available_height();
     let spacer = (avail_h - bottom_h - 20.0).max(24.0);
