@@ -87,7 +87,11 @@ impl PhotocraftApp {
         // So does selecting another layer or document by any route (#6483).
         type_tool::end_if_left(self);
         transform_tool::end_if_left(self);
+        #[cfg(not(target_arch = "wasm32"))]
         prefs_ui::tick(self, ctx, std::time::Instant::now());
+        // `std::time::Instant::now` panics on the web: its upkeep runs without the clock.
+        #[cfg(target_arch = "wasm32")]
+        prefs_ui::tick_web(self, ctx);
         updates_ui::tick(self);
         #[cfg(not(target_arch = "wasm32"))]
         crate::text::installed_fonts::tick(self, ctx);

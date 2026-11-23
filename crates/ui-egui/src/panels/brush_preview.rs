@@ -216,7 +216,7 @@ mod tests {
         b.shape_dynamics.size.jitter = 0.4;
         b.texture.enabled = true;
         b.dual_brush.enabled = true;
-        let t0 = std::time::Instant::now();
+        let t0 = web_time::Instant::now();
         preview_pixels(&b, 488, 76, [1.0; 4]);
         eprintln!("strip render: {:.2} ms", t0.elapsed().as_secs_f64() * 1e3);
     }

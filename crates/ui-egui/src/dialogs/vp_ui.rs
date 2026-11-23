@@ -7,7 +7,7 @@
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock, PoisonError};
-use std::time::Instant;
+use web_time::Instant;
 
 use craft::behavior::geometry::quad::Homography;
 use craft::behavior::kurbo::Point;

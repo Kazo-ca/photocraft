@@ -11,7 +11,7 @@
 
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
-use std::time::Instant;
+use web_time::Instant;
 
 use craft::behavior::PixelSize;
 use craft::host::queue::Cancel;

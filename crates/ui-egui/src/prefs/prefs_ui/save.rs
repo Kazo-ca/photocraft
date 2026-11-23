@@ -1,7 +1,9 @@
 use photocraft_engine::link_watch::LinkWatchExt;
 use photocraft_engine::prefs::SavedPrefsExt;
+#[cfg(not(target_arch = "wasm32"))]
 use std::time::Instant;
 
+#[cfg(not(target_arch = "wasm32"))]
 use craft::platform::autosave::{AutosaveDoc, interval_for_minutes};
 
 use super::appearance::{canvas_style, sync_appearance, sync_display_scale, sync_tooltips};
@@ -18,7 +20,36 @@ const SAVE_FAILED_TITLE: &str = "Preferences can't be saved";
 /// Nothing here reads the frame's input, so a second call in one frame does nothing new: the
 /// preferences revision is already handed over, the store and the autosave timer have nothing
 /// due at the same `now`, and the autosave results were drained by the first call.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn tick(app: &mut PhotocraftApp, ctx: &egui::Context, now: Instant) {
+    upkeep(app, ctx);
+    let save_at = store_preferences(app, now);
+    sync_gpu_style(app);
+    autosave(app, now);
+    if let Some(at) = [save_at, app.autosave.deadline()].into_iter().flatten().min() {
+        ctx.request_repaint_after(at.saturating_duration_since(now));
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    link_updates(app, ctx);
+    history_log(app);
+}
+
+/// The web build's per-frame upkeep: [`tick`] without its clock. `std::time::Instant` is not
+/// implemented on `wasm32-unknown-unknown` (`Instant::now` panics, "time not implemented on this
+/// platform"), and the clock only drives the settings store's debounce and the autosave timer,
+/// which the web build has neither of: it saves preferences on every change through
+/// `Services::save_prefs`, and gives no `Services::autosave`.
+#[cfg(target_arch = "wasm32")]
+pub fn tick_web(app: &mut PhotocraftApp, ctx: &egui::Context) {
+    upkeep(app, ctx);
+    store_preferences_web(app);
+    sync_gpu_style(app);
+    history_log(app);
+}
+
+/// The upkeep that needs no clock: loading, recovery, and keeping the UI in step with the
+/// preferences.
+fn upkeep(app: &mut PhotocraftApp, ctx: &egui::Context) {
     if !app.prefs_rt.loaded {
         load(app);
     }
@@ -32,7 +63,10 @@ pub fn tick(app: &mut PhotocraftApp, ctx: &egui::Context, now: Instant) {
     app.sync_recent();
     #[cfg(not(target_arch = "wasm32"))]
     super::agents::sync_agent_link(app, ctx);
-    let save_at = store_preferences(app, now);
+}
+
+/// Hands the canvas style the preferences give to the GPU compositor when it changed.
+fn sync_gpu_style(app: &mut PhotocraftApp) {
     let style = canvas_style(app);
     if let Some(gpu) = app.gpu.as_ref()
         && app.prefs_rt.gpu_style != Some(style)
@@ -40,13 +74,6 @@ pub fn tick(app: &mut PhotocraftApp, ctx: &egui::Context, now: Instant) {
         gpu.set_style(style);
         app.prefs_rt.gpu_style = Some(style);
     }
-    autosave(app, now);
-    if let Some(at) = [save_at, app.autosave.deadline()].into_iter().flatten().min() {
-        ctx.request_repaint_after(at.saturating_duration_since(now));
-    }
-    #[cfg(not(target_arch = "wasm32"))]
-    link_updates(app, ctx);
-    history_log(app);
 }
 
 /// Hands a changed preferences revision to the settings store (`now`: the store's change time;
@@ -91,13 +118,13 @@ fn store_preferences(app: &mut PhotocraftApp, now: Instant) -> Option<Instant> {
 /// The web build saves through `Services::save_prefs` (browser storage) until it opens its own
 /// settings store (FW-264): the whole document on every change, no retry.
 #[cfg(target_arch = "wasm32")]
-fn store_preferences(app: &mut PhotocraftApp, _now: Instant) -> Option<Instant> {
+fn store_preferences_web(app: &mut PhotocraftApp) {
     let rev = app.session.prefs.rev();
     if rev == app.prefs_rt.saved_rev {
-        return None;
+        return;
     }
     let text = app.session.prefs_to_json();
-    let Some(save) = app.services.save_prefs.as_mut() else { return None };
+    let Some(save) = app.services.save_prefs.as_mut() else { return };
     match save(&text) {
         Ok(()) => {
             app.prefs_rt.saved_rev = rev;
@@ -105,7 +132,6 @@ fn store_preferences(app: &mut PhotocraftApp, _now: Instant) -> Option<Instant> 
         }
         Err(e) => save_failed(app, &e),
     }
-    None
 }
 
 /// A preferences write failed; the store retries it. The first failure in a row sets the status
@@ -199,6 +225,7 @@ fn link_updates(app: &mut PhotocraftApp, ctx: &egui::Context) {
 ///
 /// A saved or closed document needs no `Autosave::forget` here: the timer's next `due` finds it
 /// clean or gone and lists it in `discard` (craft-platform autosave/timer.rs:124-132).
+#[cfg(not(target_arch = "wasm32"))]
 fn autosave(app: &mut PhotocraftApp, now: Instant) {
     if app.services.autosave.is_none() {
         return;
@@ -248,6 +275,7 @@ fn autosave(app: &mut PhotocraftApp, now: Instant) {
 }
 
 /// The status line of a failed autosave (`Autosave::finished`'s text); the next interval retries.
+#[cfg(not(target_arch = "wasm32"))]
 fn autosave_failed(app: &mut PhotocraftApp, text: String) {
     app.ui.status = text;
     app.ui.status_error = true;
