@@ -75,7 +75,6 @@ impl PhotocraftApp {
         self.check_gpu(ctx);
         #[cfg(all(debug_assertions, not(target_arch = "wasm32")))]
         let _ = self.live_tokens.poll(ctx, &self.ui.theme);
-        #[cfg(not(target_arch = "wasm32"))]
         self.drain_control(ctx);
         view_cmds::leave_full_screen_without_document(self);
         // A box drag that ended without a release reaching the Type tool keeps its box, before
@@ -130,10 +129,7 @@ impl PhotocraftApp {
         // target, and the runtime repaints while files hover.
         crate::file_open::log_drag_over(ctx, ctx.input(|i| i.raw.hovered_files.len()));
         self.place_next_dropped(ctx);
-        #[cfg(not(target_arch = "wasm32"))]
         let capture_unissued = self.poll_captures(ctx);
-        #[cfg(target_arch = "wasm32")]
-        let capture_unissued = false;
         // A hidden host runs no UI pass: a queued (or re-queued) capture asks for one. An issued
         // capture's own `Screenshot` command forces its paint; asking again would spin a hidden
         // window while a slow readback is in flight. Synthetic input queued during hidden ticks
@@ -164,7 +160,6 @@ impl PhotocraftApp {
         self.ui_body(ui);
         // What an injected step changed is the target of the rest of its request: only a change
         // between passes withdraws queued input (`withdraw_stale_input`).
-        #[cfg(not(target_arch = "wasm32"))]
         if self.input_queued_for.is_some() && WindowHost::of(&ctx).injected_pass() {
             self.input_queued_for = Some(self.input_target());
         }
@@ -199,7 +194,6 @@ impl PhotocraftApp {
         self.poll_file_dialog();
         // Issue any due `ui.screenshot` now that this pass's state is settled: a queued request
         // that has waited its passes and animation delay captures exactly this frame.
-        #[cfg(not(target_arch = "wasm32"))]
         self.issue_captures(&ctx);
         // Last, after everything drawn this frame: a lost window device can't draw it (#3438).
         gpu_status::check_window(self, &ctx);

@@ -4,7 +4,7 @@
 //! (`craft::automation::dialogs::dialog_id`). Production's field and choice names map to the framework's field ids
 //! through [`FIELD_KEYS`], in one place for every dialog type.
 
-use craft::automation::dialogs::dialog_id;
+use crate::control::craft_dialogs::dialog_id;
 use craft::ui::dialog::DialogId;
 use serde_json::{Value, json};
 

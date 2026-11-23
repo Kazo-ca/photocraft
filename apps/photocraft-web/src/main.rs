@@ -5,7 +5,9 @@
 //! from this directory; see `docs/development.md` ("Web build").
 //!
 //! Differences from the desktop app:
-//! - no TCP control server (browsers can't listen on sockets);
+//! - no TCP control server (browsers can't listen on sockets): with `?control` in the URL the page
+//!   gets `window.photocraft` instead (`craft-web-api`: `request`, `execute`, `commands`,
+//!   `docInspect`, `uiInspect`, `screenshot`), which drives the same control methods (`api`);
 //! - file pickers return browser file contents asynchronously through `Services::file_dialog`;
 //!   this includes File → Open and commands such as Place Embedded;
 //! - saving/exporting triggers a browser download;
@@ -17,6 +19,9 @@
 //! images (diagnostics only).
 
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
+
+#[cfg(any(target_arch = "wasm32", test))]
+mod api;
 
 #[cfg(any(target_arch = "wasm32", test))]
 mod diagnostics;

@@ -27,7 +27,6 @@ macro_rules! tl {
 mod brush_mode_menu;
 pub mod canvas;
 mod channel_titles;
-#[cfg(not(target_arch = "wasm32"))]
 pub mod control;
 pub mod dialogs;
 pub mod dock;
@@ -71,7 +70,6 @@ use photocraft_doc::{DocId, Document};
 use photocraft_engine::Session;
 use serde_json::{Value, json};
 
-#[cfg(not(target_arch = "wasm32"))]
 pub use control::{ControlRequest, ControlResponse};
 pub use craft::window::{
     Prefix,
@@ -403,8 +401,7 @@ pub struct PhotocraftApp {
     pub(crate) opacity_keys: craft::behavior::DigitKeys,
     /// The control channel: requests from a transport, the replies waiting on input, jobs and
     /// screenshots, and the screenshot queue (`app/control.rs`).
-    #[cfg(not(target_arch = "wasm32"))]
-    control: Option<craft::automation::ControlChannel>,
+    control: Option<craft::automation::control::ControlChannel>,
     /// Live (uncommitted) adjustment edit shown on canvas while a slider is dragged.
     pub live_adjust: Option<(photocraft_doc::LayerId, Value)>,
     /// Frames rendered (for tests and the status bar).
@@ -511,7 +508,6 @@ pub struct PhotocraftApp {
     pub(crate) levels_clipping: Option<levels_clipping::Cache>,
     /// The active document injected input was queued for (`ui.click`, `ui.key`, …), while it is
     /// queued: a switch of the active document withdraws it (`withdraw_stale_input`).
-    #[cfg(not(target_arch = "wasm32"))]
     pub(crate) input_queued_for: Option<InputTarget>,
     /// True only while a pass's input carries injected automation input
     /// (`WindowHost::injected_pass`). It makes shortcut- and dialog-triggered commands pass the
@@ -718,7 +714,6 @@ pub struct PhotocraftApp {
 }
 
 /// The active document injected input was queued for.
-#[cfg(not(target_arch = "wasm32"))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct InputTarget {
     /// The active document's generation: it changes on every switch of the active document, a

@@ -44,13 +44,21 @@
 //!   `engine.execute`, `ui.menu.invoke` and `ui.dialog.confirm` wait for a command that runs as a
 //!   job unless `wait: false` (then the reply is `{job, pending: true}`)
 
-pub use craft::automation::{ControlRequest, ControlResponse, REPLY_DEADLINE, Reply};
+// The paths under `control` and `protocol`: craft-automation re-exports them at its root for the
+// desktop only, and the web build's `window.photocraft` (`?control`) drives the same channel.
+pub use craft::automation::control::{ControlRequest, ControlResponse, Dispatch, Reply};
+pub use craft::automation::protocol::REPLY_DEADLINE;
 use serde_json::{Value, json};
 
 use crate::PhotocraftApp;
 use crate::state::Tool;
 
 pub(crate) mod dialogs;
+// craft-automation builds its `dialogs` module for the desktop only: the web build carries a copy.
+#[cfg(target_arch = "wasm32")]
+pub(crate) mod craft_dialogs;
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) use craft::automation::dialogs as craft_dialogs;
 mod dispatch;
 mod inspect;
 mod params;

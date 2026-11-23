@@ -108,6 +108,10 @@ pub fn start() {
                     let mut initial = Some(load_initial_preferences(&presets, database.is_some() && !session.actions().list.actions().is_empty()));
                     services.load_prefs = Some(Box::new(move || initial.take().unwrap_or_else(stored_preferences)));
                     let mut app = PhotocraftApp::with_context(cc.egui_ctx.clone(), session, services);
+                    // `?control`: `window.photocraft`, the page command API over the control channel.
+                    if crate::api::wanted(&q) {
+                        app = crate::api::install(app, cc.egui_ctx.clone());
+                    }
                     if !preset_warnings.is_empty() {
                         photocraft_ui_egui::notices::post(
                             &mut app,
@@ -454,8 +458,9 @@ impl eframe::App for WebShell {
         // A tap reaches eframe as Pointer Events and Touch Events: keep one press per tap, or the
         // twin press closes the menu the first one opened (#2095).
         photocraft_ui_egui::touch_twins::drop_twins(ctx, raw_input);
-        // The clipboard key mapping (`Event::PasteImage`), legacy pinch, pen-hold and titlebar
-        // normalization live in the app hook and must run here too.
+        // The browser build has no TCP control server (`window.photocraft` may queue synthetic
+        // input with `?control`), and the clipboard key mapping (`Event::PasteImage`), legacy pinch,
+        // pen-hold and titlebar normalization live in the app hook and must run here too.
         eframe::App::raw_input_hook(&mut self.app, ctx, raw_input);
     }
 

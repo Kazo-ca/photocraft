@@ -15,6 +15,7 @@ fn entry_json(entry: &Entry<String>) -> Value {
 
 /// The agent link for `ui.inspect`: its status (`port`, `launchFlags`, `error`), the suite's
 /// `AI-MCP` flag (`mcpFlag`) and the ArtCraft Launcher's switch (`launcher`).
+#[cfg(not(target_arch = "wasm32"))]
 fn agent_link_json(app: &PhotocraftApp) -> Value {
     let status = app.services.agent_link.as_ref().map(|link| link.status().clone()).unwrap_or_default();
     let switch = app.services.agent_switch.as_ref();
@@ -24,6 +25,12 @@ fn agent_link_json(app: &PhotocraftApp) -> Value {
         m.insert("launcher".into(), json!(switch.is_some_and(|s| s.launcher())));
     }
     v
+}
+
+/// The web build has no agent link (no MCP launcher, no TCP port): `null`.
+#[cfg(target_arch = "wasm32")]
+fn agent_link_json(_app: &PhotocraftApp) -> Value {
+    Value::Null
 }
 
 /// The open canvas context menu's rows for `ui.state`: the spelling suggestions first (type edit
@@ -91,7 +98,7 @@ fn notices(app: &PhotocraftApp, ctx: &egui::Context) -> Value {
 pub fn inspect(app: &PhotocraftApp, ctx: &egui::Context) -> Value {
     let screen = ctx.content_rect();
     // The framework host's dialogs in their one stack order (top last).
-    let mut dialogs = craft::automation::dialogs::inspect(&app.framework.dialogs);
+    let mut dialogs = crate::control::craft_dialogs::inspect(&app.framework.dialogs);
     crate::layer_style::describe_params(app, &mut dialogs);
     crate::discard_ui::describe(app, &mut dialogs);
     // Keyboard Shortcuts and Menus draws beneath the host's dialogs, outside the host (#15544).

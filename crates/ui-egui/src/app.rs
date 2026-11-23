@@ -8,7 +8,6 @@ use super::{
 
 mod clipboard;
 mod commands;
-#[cfg(not(target_arch = "wasm32"))]
 mod control;
 pub(crate) mod doc_queries;
 mod files;
@@ -89,7 +88,6 @@ impl PhotocraftApp {
             move_pick: None,
             caps_lock: false,
             opacity_keys: craft::behavior::DigitKeys::default(),
-            #[cfg(not(target_arch = "wasm32"))]
             control: None,
             live_adjust: None,
             frame: 0,
@@ -140,7 +138,6 @@ impl PhotocraftApp {
             adjust_preview: None,
             live_adjust_preview: None,
             levels_clipping: None,
-            #[cfg(not(target_arch = "wasm32"))]
             input_queued_for: None,
             automation_input: false,
             programmatic_playback: false,
@@ -266,7 +263,6 @@ impl eframe::App for PhotocraftApp {
         if let Err(err) = tool_memory::save_on_exit(self) {
             log::warn!("Preferences: could not save the final tool state: {err}");
         }
-        #[cfg(not(target_arch = "wasm32"))]
         self.close_control();
     }
 
@@ -291,7 +287,6 @@ impl eframe::App for PhotocraftApp {
         // Native menu clicks become the commands they fire (see `native_menu`).
         native_menu::poll(self, ctx);
         shortcuts::clipboard_keys(ctx, ctx.text_edit_focused() || self.ui.text_edit.is_some(), raw_input);
-        #[cfg(not(target_arch = "wasm32"))]
         self.withdraw_stale_input(ctx);
         // A pen held still is no touch screen's press-and-hold right click (stylus.rs).
         let pen_down = self.stylus.pen_contacts.observe(&raw_input.events);
