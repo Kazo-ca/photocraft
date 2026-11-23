@@ -2,27 +2,15 @@
 //! a file handed over with its name lives there, only saves of the document go to it, each says
 //! whether it is a Save As, and the document is saved only once the shell confirms the write.
 
-use crate::file_dialog::{FileDialogAnswer, FileDialogFn, FileDialogRequest};
 use crate::{PhotocraftApp, Services, menus};
 use photocraft_engine::Session;
 use serde_json::json;
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, rc::Rc, sync::Arc};
 
 /// (path, save_as, doc, revision) of each document save handed over.
 type Handed = Rc<RefCell<Vec<(String, bool, photocraft_doc::DocId, u64)>>>;
 /// Paths written through `write` (copies, exports).
 type Downloaded = Rc<RefCell<Vec<String>>>;
-
-/// A save dialog that answers like the web build: the suggested file's name.
-fn web_dialog() -> FileDialogFn {
-    Box::new(|request, _parent, reply| match request {
-        FileDialogRequest::Save { suggested } => {
-            let name = std::path::Path::new(&suggested).file_name().map_or(suggested.clone(), |n| n.to_string_lossy().into_owned());
-            reply.send(Some(FileDialogAnswer::SaveTo(name)));
-        }
-        _ => reply.send(None),
-    })
-}
 
 fn hosted_app() -> (PhotocraftApp, Handed, Downloaded) {
     let handed: Handed = Rc::default();
@@ -37,7 +25,8 @@ fn hosted_app() -> (PhotocraftApp, Handed, Downloaded) {
             export: Some(Box::new(|doc, path, _| {
                 photocraft_io::export(doc, path, &Default::default()).map(|r| (r.bytes, r.warnings)).map_err(|e| e.to_string())
             })),
-            file_dialog: Some(web_dialog()),
+            // A save picker that keeps the suggested name, as the web build's does.
+            files: Some(Arc::new(craft::host::ScriptedFiles::new().saving_suggested())),
             write: Some(Box::new(move |path, _| {
                 d.borrow_mut().push(path.to_string());
                 Ok(())
@@ -52,7 +41,7 @@ fn hosted_app() -> (PhotocraftApp, Handed, Downloaded) {
             ..Default::default()
         },
     );
-    (app, handed, downloaded)
+    (*app, handed, downloaded)
 }
 
 /// A file's bytes: a 4×4 document saved as `name`, with one more layer when `layered`.
@@ -75,7 +64,7 @@ fn open(app: &mut PhotocraftApp, name: &str, layered: bool) {
 fn save(app: &mut PhotocraftApp, command: &str) {
     let ctx = egui::Context::default();
     menus::invoke(app, &ctx, command, json!({})).unwrap();
-    app.poll_file_dialog(&ctx, None);
+    app.poll_file_dialog();
 }
 
 fn last(handed: &Handed) -> (String, bool) {

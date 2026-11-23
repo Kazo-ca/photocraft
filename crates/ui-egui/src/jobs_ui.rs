@@ -594,7 +594,6 @@ fn on_event(app: &mut PhotocraftApp, ctx: &egui::Context, e: JobEvent) {
         beep();
     }
     // Control requests waiting on this job; a cancelled batch reports the files it finished.
-    #[cfg(not(target_arch = "wasm32"))]
     {
         use craft::automation::control::result_reply;
         let reply = match &e.outcome {

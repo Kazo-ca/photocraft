@@ -88,7 +88,8 @@ pub fn about_info(app: &PhotocraftApp) -> AboutInfo {
 fn hosted_about(mut info: AboutInfo) -> AboutInfo {
     info.community = None;
     info.links.retain(|link| link.url != crate::links::ARTCRAFT_WEBSITE);
-    info.blurb = format!("{}\n{}", tl!("PhotoCraft — an open-source, native image editor written in Rust."), tl!("Based on PhotoCraft by the ArtCraft team.")).into();
+    info.blurb =
+        format!("{}\n{}", tl!("PhotoCraft — an open-source, native image editor written in Rust."), tl!("Based on PhotoCraft by the ArtCraft team.")).into();
     info
 }
 
@@ -143,6 +144,18 @@ pub(crate) fn take(app: &mut PhotocraftApp, ctx: &egui::Context) {
 mod nightly_about_tests {
     use super::*;
     use crate::os_window::LaunchIdentity;
+
+    #[test]
+    fn hosted_about_keeps_the_project_links_without_the_brand() {
+        let info = about_info_for(LaunchIdentity::Stable, "0.24.0".into(), None);
+        let hosted = hosted_about(about_info_for(LaunchIdentity::Stable, "0.24.0".into(), None));
+        assert!(info.community.is_some() && hosted.community.is_none(), "no community button in a host");
+        let urls = |i: &AboutInfo| i.links.iter().map(|l| l.url.clone()).collect::<Vec<_>>();
+        assert!(urls(&info).iter().any(|u| u == crate::links::ARTCRAFT_WEBSITE));
+        assert!(!urls(&hosted).iter().any(|u| u == crate::links::ARTCRAFT_WEBSITE), "no ArtCraft link in a host");
+        assert!(urls(&hosted).iter().any(|u| u == crate::links::GITHUB), "the source stays reachable");
+        assert_eq!(hosted.version, info.version);
+    }
 
     #[test]
     fn stable_about_preserves_its_name_version_and_existing_links() {

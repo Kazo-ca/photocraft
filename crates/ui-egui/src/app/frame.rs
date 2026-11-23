@@ -144,7 +144,6 @@ impl PhotocraftApp {
         let ctx = ui.ctx().clone();
         // A real UI pass, not a hidden `run_logic` tick, which leaves these input values stale:
         // only this phase counts toward settling.
-        #[cfg(not(target_arch = "wasm32"))]
         self.note_capture_pass(&ctx);
         // A pass whose input carries an injected step acts for the automation client.
         self.automation_input = WindowHost::of(&ctx).injected_pass();
@@ -180,7 +179,6 @@ impl PhotocraftApp {
         self.finish_frame(&ctx, ui_ms);
         // The window host injects one step per pass and asks for the next pass itself; once it has
         // run every step, the replies waiting on them are answered.
-        #[cfg(not(target_arch = "wasm32"))]
         self.poll_input(&ctx);
         // A menu or dialog can start a filter after `jobs_ui::tick` ran in this frame. Keep
         // polling it even when the platform would otherwise put the event loop to sleep.
